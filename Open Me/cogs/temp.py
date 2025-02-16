@@ -5,7 +5,7 @@ import sqlite3
 
 
 
-channel_name = "📩・join to create"
+channel_name = "TempVoice"
 
 class TempVoice(commands.Cog):
     def __init__(self, bot):
@@ -38,18 +38,19 @@ class TempVoice(commands.Cog):
                 await channel.edit(name=name, user_limit=user_limit)
 
             await member.move_to(channel)
-            await channel.set_permissions(member, manage_channels=True)
+            await channel.set_permissions(member, manage_channels=True, mention_everyone = False)
             
             self.cursor.execute("INSERT INTO channels VALUES (?, ?)", 
                               (channel.id, member.id))
             self.conn.commit()
             
-            view = TempVoiceView(self)
+            view = TempVoiceView(self, channel)
             embed = discord.Embed(
                 title=f"{member.display_name}",
                 description="# Hier kannst du deinen Channel verwalten.",
                 color=discord.Color.yellow()
             )
+            embed.set_footer(text="Veronic")
             embed.set_author(name=f"Temp-Voice", icon_url=f"{member.avatar.url}")
             await channel.send(embed=embed, view=view)
 
@@ -73,9 +74,10 @@ class TempVoice(commands.Cog):
                 self.conn.commit()
 
 class TempVoiceView(View):
-    def __init__(self, cog):
+    def __init__(self, cog, channel : discord.VoiceChannel):
         super().__init__(timeout=None)
         self.cog = cog
+        self.channel = channel
 
     @discord.ui.button(label="Kick", style=discord.ButtonStyle.danger, emoji="👢")
     async def kick(self, button: Button, interaction: discord.Interaction):
@@ -94,11 +96,37 @@ class TempVoiceView(View):
         modal = LimitModal(self.cog)
         await interaction.response.send_modal(modal)        
 
+
+    @discord.ui.button(label="🔒 Sperren", style=discord.ButtonStyle.danger)
+    async def lock(self, button: Button, interaction: discord.Interaction):
+        channel = interaction.user.voice.channel
+        
+        await self.channel.set_permissions(interaction.guild.default_role, connect=False)
+        await interaction.response.send_message("🔒 Der Channel wurde gesperrt!", ephemeral=True)
+
+    @discord.ui.button(label="🔓 Entsperren", style=discord.ButtonStyle.success)
+    async def unlock(self, button: Button, interaction: discord.Interaction):
+        channel = interaction.user.voice.channel
+        await self.channel.set_permissions(interaction.guild.default_role, connect=True)
+        await interaction.response.send_message("🔓 Der Channel wurde entsperrt!", ephemeral=True)
+        
+    @discord.ui.button(label="Verstecken", style=discord.ButtonStyle.secondary, emoji="👻")
+    async def hide(self, button: Button, interaction: discord.Interaction):
+        channel = interaction.user.voice.channel
+        await self.channel.set_permissions(interaction.guild.default_role, view_channel=False)
+        await interaction.response.send_message("Dein Channel ist nun Versteckt", ephemeral=True)     
+        
+    @discord.ui.button(label="Auftauchen", style=discord.ButtonStyle.secondary, emoji="👻")
+    async def appear(self, button: Button, interaction: discord.Interaction):
+        channel = interaction.user.voice.channel
+        await self.channel.set_permissions(interaction.guild.default_role, view_channel=True)
+        await interaction.response.send_message(" Der Channel wird wieder angezeigt", ephemeral=True)        
+        
     @discord.ui.button(label="Ban", style=discord.ButtonStyle.danger, emoji="🔨")
     async def ban(self, button: Button, interaction: discord.Interaction):
         modal = BanModal(self.cog)
         await interaction.response.send_modal(modal)
-
+        
     @discord.ui.button(label="Unban", style=discord.ButtonStyle.success, emoji="🔓") 
     async def unban(self, button: Button, interaction: discord.Interaction):
         channel = interaction.user.voice.channel
